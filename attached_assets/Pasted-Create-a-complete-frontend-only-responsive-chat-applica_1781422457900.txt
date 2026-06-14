@@ -1,0 +1,344 @@
+Create a complete frontend-only responsive chat application called PingX.
+
+Tech Stack:
+- React
+- TypeScript
+- TailwindCSS
+- React Router
+- Framer Motion
+- Lucide React Icons
+
+Theme:
+- Dark mode only
+- Background: #050505
+- Neon Green Accent: #C6FF3B
+- Purple Accent: #C9A8FF
+- Pink Accent: #FFC6DA
+- Modern Glassmorphism
+- Rounded Corners (24px)
+- Smooth Animations
+
+Create the following pages and routes:
+
+/home
+/settings
+/profile
+/add-friend
+/remove-friend
+/privacy
+/notifications
+/help-support
+/chat/:id
+/contact-info/:id
+
+------------------------------------------------
+
+HOME PAGE
+
+Top Left:
+Settings Icon
+
+Top Right:
+User Avatar
+
+Greeting:
+
+"Bhooooooooooooooooooooooo!!!"
+
+"Howz ur day goinnn??!!"
+
+Cards Section:
+
+Large Green Card:
+Notes
+
+Small Purple Card:
+Add Friend
+
+Small Pink Card:
+Add Thought
+
+Recent Chats Section:
+
+Display recent contacts list
+
+Each Contact:
+- Avatar
+- Name
+- Last Message
+- Timestamp
+- Online Indicator
+
+Clicking Contact:
+Navigate to /chat/:id
+
+------------------------------------------------
+
+NOTES PAGE
+
+Allow user to:
+
+- Create note
+- Edit note
+- Delete note
+
+Card Layout
+
+Sticky Notes Style
+
+------------------------------------------------
+
+ADD THOUGHT PAGE
+
+Single Text Area
+
+Placeholder:
+
+"What's on your mind?"
+
+Save Button
+
+Display previously saved thoughts
+
+------------------------------------------------
+
+ADD FRIEND PAGE
+
+Title:
+
+Add Friends
+
+Phone Number Input
+
+Only numeric values allowed
+
+Country Code Dropdown
+
+Add Friend Button
+
+Validation:
+
+Only numbers
+Minimum 10 digits
+
+Success Toast
+
+------------------------------------------------
+
+REMOVE FRIEND PAGE
+
+Show all contacts
+
+Each Row:
+
+Avatar
+Name
+Last Message
+
+Right Side:
+
+Red Remove Button
+
+Confirmation Modal:
+
+"Remove this contact from chat list?"
+
+Remove only chat list entry
+
+------------------------------------------------
+
+PROFILE PAGE
+
+Profile Picture
+
+Username
+
+Bio
+
+Edit Button
+
+Editable Fields:
+
+Username
+Avatar
+Bio
+
+------------------------------------------------
+
+SETTINGS PAGE
+
+Options:
+
+Add Friends
+Remove Friends
+Status
+Privacy
+Notifications
+Help & Support
+Logout
+
+------------------------------------------------
+
+STATUS PAGE
+
+Radio Buttons:
+
+Online
+Offline
+
+Online:
+Green Indicator
+
+Offline:
+Red Indicator
+
+Save Button
+
+------------------------------------------------
+
+PRIVACY PAGE
+
+Options:
+
+End-to-End Encryption Toggle
+
+Vanish Mode Toggle
+
+Description below each option
+
+------------------------------------------------
+
+NOTIFICATIONS PAGE
+
+Single Setting:
+
+Enable Notifications
+
+ON/OFF Toggle
+
+Display Current State
+
+------------------------------------------------
+
+HELP SUPPORT PAGE
+
+Title:
+
+Help & Support
+
+Large Message Text Area
+
+Placeholder:
+
+"Tell us your concern..."
+
+Send Button
+
+Success Message:
+
+"Your concern has been submitted."
+
+------------------------------------------------
+
+CHAT PAGE
+
+Route:
+
+/chat/:id
+
+Header:
+
+Back Button
+Profile Picture
+Username
+Online Status
+
+Right Side:
+
+Call Icon
+Video Icon
+Menu Icon
+
+Message Area:
+
+Incoming Bubble:
+Dark
+
+Outgoing Bubble:
+Neon Green
+
+Bottom Input:
+
+Message Box
+Emoji Icon
+Attachment Icon
+Send Button
+
+Mock Data
+
+Auto Scroll
+
+------------------------------------------------
+
+CONTACT INFO PAGE
+
+Opened when clicking username/profile inside chat
+
+Profile Picture
+
+Username
+
+Phone Number
+
+Status
+
+Options:
+
+Edit Name
+Media
+Block Contact
+Delete Chat
+
+Block Button:
+Red
+
+Delete Chat:
+Red
+
+Media:
+Grid Gallery
+
+------------------------------------------------
+
+ANIMATIONS
+
+Use Framer Motion
+
+Card Hover
+
+Page Transitions
+
+Button Press Effects
+
+------------------------------------------------
+
+RESPONSIVE
+
+Mobile First
+
+Tablet Support
+
+Desktop Support
+
+------------------------------------------------
+
+Generate:
+
+1. Folder Structure
+2. Routing Setup
+3. Components
+4. Mock Data
+5. Complete Frontend
+6. Reusable UI Components
+7. Navigation Between Pages
+8. Clean Code
