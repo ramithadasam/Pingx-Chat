@@ -1,49 +1,36 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PageHeader } from '../components/ui/custom/PageHeader';
-import { GlassCard } from '../components/ui/custom/GlassCard';
-import { Plus, Edit2, Trash2, X } from 'lucide-react';
+import { Plus, Trash2, Check } from 'lucide-react';
 import { Note } from '../types';
 
 export default function NotesPage() {
   const { notes, addNote, updateNote, deleteNote } = useApp();
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingNote, setEditingNote] = useState<Note | null>(null);
-  const [noteContent, setNoteContent] = useState('');
-  const [noteColor, setNoteColor] = useState<'green' | 'purple' | 'pink'>('green');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState('');
+  const [editColor, setEditColor] = useState<'green' | 'purple' | 'pink'>('green');
+  const [isCreating, setIsCreating] = useState(false);
+  const [newContent, setNewContent] = useState('');
+  const [newColor, setNewColor] = useState<'green' | 'purple' | 'pink'>('green');
+  const newNoteRef = useRef<HTMLTextAreaElement>(null);
+  const editRef = useRef<HTMLTextAreaElement>(null);
 
-  const openModal = (note?: Note) => {
-    if (note) {
-      setEditingNote(note);
-      setNoteContent(note.content);
-      setNoteColor(note.color);
-    } else {
-      setEditingNote(null);
-      setNoteContent('');
-      setNoteColor('green');
+  useEffect(() => {
+    if (isCreating && newNoteRef.current) {
+      newNoteRef.current.focus();
     }
-    setIsModalOpen(true);
-  };
+  }, [isCreating]);
 
-  const handleSave = () => {
-    if (!noteContent.trim()) return;
-    
-    if (editingNote) {
-      updateNote(editingNote.id, { content: noteContent, color: noteColor });
-    } else {
-      addNote({
-        id: Date.now().toString(),
-        content: noteContent,
-        color: noteColor,
-        createdAt: new Date().toISOString()
-      });
+  useEffect(() => {
+    if (editingId && editRef.current) {
+      editRef.current.focus();
+      editRef.current.selectionStart = editRef.current.value.length;
     }
-    setIsModalOpen(false);
-  };
+  }, [editingId]);
 
   const getColorHex = (color: string) => {
-    switch(color) {
+    switch (color) {
       case 'green': return '#C6FF3B';
       case 'purple': return '#C9A8FF';
       case 'pink': return '#FFC6DA';
@@ -51,113 +38,178 @@ export default function NotesPage() {
     }
   };
 
+  const startEdit = (note: Note) => {
+    setEditingId(note.id);
+    setEditContent(note.content);
+    setEditColor(note.color);
+  };
+
+  const saveEdit = (note: Note) => {
+    if (editContent.trim()) {
+      updateNote(note.id, { content: editContent, color: editColor });
+    }
+    setEditingId(null);
+  };
+
+  const saveNew = () => {
+    if (newContent.trim()) {
+      addNote({
+        id: Date.now().toString(),
+        content: newContent,
+        color: newColor,
+        createdAt: new Date().toISOString(),
+      });
+    }
+    setNewContent('');
+    setNewColor('green');
+    setIsCreating(false);
+  };
+
+  const ColorPicker = ({ value, onChange }: { value: string; onChange: (c: 'green' | 'purple' | 'pink') => void }) => (
+    <div className="flex gap-2 mt-3">
+      {(['green', 'purple', 'pink'] as const).map(c => (
+        <button
+          key={c}
+          data-testid={`color-${c}`}
+          onClick={(e) => { e.stopPropagation(); onChange(c); }}
+          className={`w-6 h-6 rounded-full border-2 transition-transform ${value === c ? 'border-[#050505] scale-110' : 'border-transparent'}`}
+          style={{ backgroundColor: getColorHex(c) }}
+        />
+      ))}
+    </div>
+  );
+
   const containerVariants = {
     hidden: { opacity: 0 },
-    show: {
-      opacity: 1,
-      transition: { staggerChildren: 0.05 }
-    }
+    show: { opacity: 1, transition: { staggerChildren: 0.05 } },
   };
 
   const itemVariants = {
-    hidden: { opacity: 0, scale: 0.8 },
-    show: { opacity: 1, scale: 1 }
+    hidden: { opacity: 0, scale: 0.85 },
+    show: { opacity: 1, scale: 1 },
   };
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -20, opacity: 0 }} transition={{ duration: 0.2 }}
-      className="min-h-[100dvh] relative pb-20"
+      className="min-h-[100dvh] relative pb-24"
     >
-      <PageHeader title="My Notes" />
-      
+      <PageHeader title="My Notes" subtitle="Tap a note to edit" />
+
       <div className="p-4">
-        <motion.div 
-          variants={containerVariants} initial="hidden" animate="show"
-          className="grid grid-cols-2 gap-4"
-        >
-          {notes.map(note => (
-            <motion.div key={note.id} variants={itemVariants}>
-              <div 
-                className="rounded-[24px] p-4 min-h-[160px] flex flex-col justify-between"
-                style={{ backgroundColor: getColorHex(note.color) }}
+        <motion.div variants={containerVariants} initial="hidden" animate="show" className="grid grid-cols-2 gap-4">
+
+          {/* New note card inline */}
+          <AnimatePresence>
+            {isCreating && (
+              <motion.div
+                key="new-note"
+                variants={itemVariants}
+                initial="hidden"
+                animate="show"
+                exit={{ opacity: 0, scale: 0.85 }}
+                className="rounded-[24px] p-4 min-h-[160px] flex flex-col"
+                style={{ backgroundColor: getColorHex(newColor) }}
               >
-                <p className="text-[#050505] text-[15px] font-medium leading-relaxed whitespace-pre-wrap">{note.content}</p>
-                <div className="flex justify-end gap-2 mt-4">
-                  <button onClick={() => openModal(note)} className="w-8 h-8 rounded-full bg-[#050505]/10 flex items-center justify-center hover:bg-[#050505]/20 transition-colors">
-                    <Edit2 className="w-4 h-4 text-[#050505]" />
+                <textarea
+                  ref={newNoteRef}
+                  value={newContent}
+                  onChange={(e) => setNewContent(e.target.value)}
+                  placeholder="Write your note..."
+                  className="flex-1 bg-transparent text-[#050505] text-[14px] font-medium placeholder-[#050505]/50 focus:outline-none resize-none w-full"
+                  data-testid="input-new-note"
+                  rows={4}
+                />
+                <ColorPicker value={newColor} onChange={setNewColor} />
+                <div className="flex justify-between mt-3">
+                  <button
+                    data-testid="button-cancel-new-note"
+                    onClick={() => { setIsCreating(false); setNewContent(''); }}
+                    className="text-[#050505]/60 text-xs font-medium"
+                  >
+                    Cancel
                   </button>
-                  <button onClick={() => deleteNote(note.id)} className="w-8 h-8 rounded-full bg-[#050505]/10 flex items-center justify-center hover:bg-[#050505]/20 transition-colors">
-                    <Trash2 className="w-4 h-4 text-[#050505]" />
+                  <button
+                    data-testid="button-save-new-note"
+                    onClick={saveNew}
+                    className="w-8 h-8 rounded-full bg-[#050505]/15 flex items-center justify-center hover:bg-[#050505]/25 transition-colors"
+                  >
+                    <Check className="w-4 h-4 text-[#050505]" />
                   </button>
                 </div>
-              </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Existing notes */}
+          {notes.map((note) => (
+            <motion.div key={note.id} variants={itemVariants}>
+              {editingId === note.id ? (
+                <div
+                  className="rounded-[24px] p-4 min-h-[160px] flex flex-col"
+                  style={{ backgroundColor: getColorHex(editColor) }}
+                >
+                  <textarea
+                    ref={editRef}
+                    value={editContent}
+                    onChange={(e) => setEditContent(e.target.value)}
+                    className="flex-1 bg-transparent text-[#050505] text-[14px] font-medium focus:outline-none resize-none w-full"
+                    data-testid={`input-edit-note-${note.id}`}
+                    rows={4}
+                  />
+                  <ColorPicker value={editColor} onChange={setEditColor} />
+                  <div className="flex justify-between mt-3">
+                    <button
+                      data-testid={`button-delete-note-${note.id}`}
+                      onClick={() => { deleteNote(note.id); setEditingId(null); }}
+                      className="w-8 h-8 rounded-full bg-[#050505]/10 flex items-center justify-center hover:bg-[#050505]/20 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4 text-[#050505]" />
+                    </button>
+                    <button
+                      data-testid={`button-save-note-${note.id}`}
+                      onClick={() => saveEdit(note)}
+                      className="w-8 h-8 rounded-full bg-[#050505]/15 flex items-center justify-center hover:bg-[#050505]/25 transition-colors"
+                    >
+                      <Check className="w-4 h-4 text-[#050505]" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <motion.div
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => startEdit(note)}
+                  className="rounded-[24px] p-4 min-h-[160px] flex flex-col justify-between cursor-pointer"
+                  style={{ backgroundColor: getColorHex(note.color) }}
+                  data-testid={`card-note-${note.id}`}
+                >
+                  <p className="text-[#050505] text-[14px] font-medium leading-relaxed whitespace-pre-wrap flex-1">
+                    {note.content}
+                  </p>
+                  <p className="text-[#050505]/40 text-[11px] mt-3">Tap to edit</p>
+                </motion.div>
+              )}
             </motion.div>
           ))}
         </motion.div>
+
+        {notes.length === 0 && !isCreating && (
+          <div className="text-center mt-16 text-[rgba(255,255,255,0.3)]">
+            <p className="text-lg font-medium">No notes yet</p>
+            <p className="text-sm mt-1">Tap + to create your first note</p>
+          </div>
+        )}
       </div>
 
       <motion.button
-        whileTap={{ scale: 0.95 }}
-        onClick={() => openModal()}
-        className="fixed bottom-6 right-6 w-14 h-14 bg-[#C6FF3B] rounded-full flex items-center justify-center shadow-lg z-20"
+        whileTap={{ scale: 0.9 }}
+        onClick={() => setIsCreating(true)}
+        className="fixed bottom-6 right-6 w-14 h-14 bg-[#C6FF3B] rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(198,255,59,0.4)] z-20"
+        data-testid="button-add-note"
       >
         <Plus className="w-6 h-6 text-[#050505]" />
       </motion.button>
-
-      <AnimatePresence>
-        {isModalOpen && (
-          <>
-            <motion.div 
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/80 backdrop-blur-sm z-40"
-              onClick={() => setIsModalOpen(false)}
-            />
-            <div className="fixed inset-x-0 bottom-0 z-50 p-4 pb-8 pointer-events-none flex flex-col justify-end h-full">
-              <motion.div
-                initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
-                transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                className="bg-[#111] border border-[rgba(255,255,255,0.1)] rounded-[32px] p-6 w-full pointer-events-auto"
-              >
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-xl font-semibold text-white">{editingNote ? 'Edit Note' : 'New Note'}</h2>
-                  <button onClick={() => setIsModalOpen(false)} className="p-2 rounded-full hover:bg-[rgba(255,255,255,0.1)]">
-                    <X className="w-5 h-5 text-white" />
-                  </button>
-                </div>
-                
-                <textarea
-                  value={noteContent}
-                  onChange={(e) => setNoteContent(e.target.value)}
-                  placeholder="Type your note here..."
-                  className="w-full h-32 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] rounded-[20px] p-4 text-white placeholder-[rgba(255,255,255,0.4)] focus:outline-none focus:border-[#C6FF3B] resize-none mb-6"
-                />
-                
-                <div className="flex items-center gap-4 mb-8">
-                  <span className="text-[rgba(255,255,255,0.6)] text-sm">Color:</span>
-                  <div className="flex gap-3">
-                    {(['green', 'purple', 'pink'] as const).map(color => (
-                      <button
-                        key={color}
-                        onClick={() => setNoteColor(color)}
-                        className={`w-8 h-8 rounded-full border-2 ${noteColor === color ? 'border-white' : 'border-transparent'}`}
-                        style={{ backgroundColor: getColorHex(color) }}
-                      />
-                    ))}
-                  </div>
-                </div>
-                
-                <button
-                  onClick={handleSave}
-                  className="w-full py-4 bg-[#C6FF3B] text-[#050505] rounded-full font-semibold text-lg hover:bg-[#b0eb2d] transition-colors"
-                >
-                  Save Note
-                </button>
-              </motion.div>
-            </div>
-          </>
-        )}
-      </AnimatePresence>
     </motion.div>
   );
 }
