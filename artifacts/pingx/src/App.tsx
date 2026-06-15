@@ -21,6 +21,7 @@ import HelpSupportPage from "./pages/HelpSupportPage";
 import ChatPage from "./pages/ChatPage";
 import ContactInfoPage from "./pages/ContactInfoPage";
 import StatusPage from "./pages/StatusPage";
+import FriendRequestsPage from "./pages/FriendRequestsPage";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -84,6 +85,9 @@ function Router() {
         </Route>
         <Route path="/status">
           <RequireAuth><StatusPage /></RequireAuth>
+        </Route>
+        <Route path="/friend-requests">
+          <RequireAuth><FriendRequestsPage /></RequireAuth>
         </Route>
         <Route component={NotFound} />
       </Switch>

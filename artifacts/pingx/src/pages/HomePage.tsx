@@ -1,8 +1,8 @@
 import { useApp } from '../context/AppContext';
 import { Link, useLocation } from 'wouter';
-import { Settings, ChevronRight, NotebookPen, UserPlus, Lightbulb } from 'lucide-react';
+import { Settings, ChevronRight, NotebookPen, UserPlus, Lightbulb, Bell } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { useListConversations } from '@workspace/api-client-react';
+import { useListConversations, useListFriendRequests, useListFriends, useCreateConversation, getFriendsQueryKey } from '@workspace/api-client-react';
 import type { ConversationSummary } from '@workspace/api-client-react';
 import { getAvatarUrl } from '../lib/avatar';
 import { formatMessageTime } from '../lib/format';
@@ -49,6 +49,10 @@ export default function HomePage() {
   const { user } = useApp();
   const [, setLocation] = useLocation();
   const { data: conversations = [], isLoading } = useListConversations();
+  const { data: friendRequests } = useListFriendRequests({ query: { queryKey: ['/api/friends/requests'] } });
+  const pendingRequestCount = friendRequests?.incoming?.length ?? 0;
+  const { data: friends = [] } = useListFriends({ query: { queryKey: getFriendsQueryKey() } });
+  const createConversation = useCreateConversation();
 
   const avatarSrc = getAvatarUrl(user?.avatarUrl ?? null, user?.name ?? 'Me');
 
@@ -76,13 +80,25 @@ export default function HomePage() {
             </button>
           </Link>
 
-          <Link href="/profile">
-            <div className="relative cursor-pointer">
-              <div className="w-12 h-12 rounded-full p-[2px] bg-gradient-to-tr from-[#C6FF3B] to-[#C6FF3B] overflow-hidden">
-                <img src={avatarSrc} alt="Profile" className="w-full h-full rounded-full bg-[#111]" />
+          <div className="flex items-center gap-3">
+            <Link href="/friend-requests">
+              <button className="relative w-12 h-12 flex items-center justify-center rounded-full bg-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.1)] transition">
+                <Bell className="w-6 h-6 text-white" />
+                {pendingRequestCount > 0 && (
+                  <span className="absolute top-1 right-1 w-5 h-5 rounded-full bg-[#C6FF3B] text-[#050505] text-xs font-bold flex items-center justify-center">
+                    {pendingRequestCount}
+                  </span>
+                )}
+              </button>
+            </Link>
+            <Link href="/profile">
+              <div className="relative cursor-pointer">
+                <div className="w-12 h-12 rounded-full p-[2px] bg-gradient-to-tr from-[#C6FF3B] to-[#C6FF3B] overflow-hidden">
+                  <img src={avatarSrc} alt="Profile" className="w-full h-full rounded-full bg-[#111]" />
+                </div>
               </div>
-            </div>
-          </Link>
+            </Link>
+          </div>
         </header>
 
         <div className="mb-8">
@@ -155,6 +171,44 @@ export default function HomePage() {
             </motion.div>
           </div>
         </div>
+
+        {friends.length > 0 && (
+          <div className="mb-6">
+            <div className="flex justify-between items-center mb-3 px-1">
+              <h3 className="text-lg font-bold text-white">Friends</h3>
+            </div>
+            <div className="flex gap-4 overflow-x-auto pb-2 no-scrollbar">
+              {friends.map(({ user: friend, conversationId }) => (
+                <button
+                  key={friend.id}
+                  onClick={() => {
+                    if (conversationId) {
+                      setLocation(`/chat/${conversationId}`);
+                    } else {
+                      createConversation.mutate(
+                        { data: { userId: friend.id } },
+                        { onSuccess: (res) => setLocation(`/chat/${res.id}`) },
+                      );
+                    }
+                  }}
+                  className="flex flex-col items-center gap-1.5 shrink-0"
+                >
+                  <div className="relative">
+                    <img
+                      src={getAvatarUrl(friend.avatarUrl, friend.name)}
+                      alt={friend.name}
+                      className="w-14 h-14 rounded-full bg-[#1a1a1a]"
+                    />
+                    {friend.status === 'online' && (
+                      <div className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-[#C6FF3B] border-2 border-[#050505]" />
+                    )}
+                  </div>
+                  <span className="text-[rgba(255,255,255,0.7)] text-xs truncate max-w-[56px]">{friend.name.split(' ')[0]}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div>
           <div className="flex justify-between items-center mb-4 px-1">
