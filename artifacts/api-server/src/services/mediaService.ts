@@ -1,5 +1,12 @@
 import { uploadBuffer, type UploadResult } from "../lib/cloudinary";
 import { AppError } from "../middleware/errorHandler";
+import { env } from "../config/env";
+
+function requireCloudinary(): void {
+  if (!env.cloudinaryEnabled) {
+    throw new AppError(503, "media_unavailable", "Media uploads are not configured on this server");
+  }
+}
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
 
@@ -18,11 +25,13 @@ export interface UploadedFile {
 }
 
 export async function uploadChatMedia(file: UploadedFile, folder: string): Promise<UploadResult> {
+  requireCloudinary();
   validateFile(file);
   return uploadBuffer(file.buffer, { folder, mimeType: file.mimetype });
 }
 
 export async function uploadAvatar(file: UploadedFile, folder: string): Promise<UploadResult> {
+  requireCloudinary();
   if (!file.mimetype.startsWith("image/")) {
     throw new AppError(400, "invalid_file_type", "Avatar must be an image");
   }

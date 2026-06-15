@@ -3,20 +3,9 @@ import app from "./app";
 import { initSockets } from "./sockets";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { logger } from "./lib/logger";
+import { env } from "./config/env";
 
-const rawPort = process.env["PORT"];
-
-if (!rawPort) {
-  throw new Error(
-    "PORT environment variable is required but was not provided.",
-  );
-}
-
-const port = Number(rawPort);
-
-if (Number.isNaN(port) || port <= 0) {
-  throw new Error(`Invalid PORT value: "${rawPort}"`);
-}
+const { port } = env;
 
 const httpServer = createServer(app);
 initSockets(httpServer);
@@ -30,5 +19,5 @@ httpServer.listen(port, (err?: Error) => {
     process.exit(1);
   }
 
-  logger.info({ port }, "Server listening");
+  logger.info({ port, env: env.nodeEnv }, "PingX API server listening");
 });
