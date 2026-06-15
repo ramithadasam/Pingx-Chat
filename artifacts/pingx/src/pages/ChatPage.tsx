@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { motion } from 'framer-motion';
 import { useParams, useLocation } from 'wouter';
-import { ArrowLeft, Phone, Video, MoreVertical, Plus, Smile, Mic, Send, CheckCheck } from 'lucide-react';
+import { ArrowLeft, Phone, Video, MoreVertical, Plus, Smile, Mic, Send, CheckCheck, Lock } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   useListConversations,
@@ -15,6 +15,8 @@ import type { Message } from '@workspace/api-client-react';
 import { getSocket, connectSocket } from '../lib/socket';
 import { getAvatarUrl } from '../lib/avatar';
 import { formatMessageTime } from '../lib/format';
+import { encryptMessage, decryptMessage, isEncrypted } from '../lib/crypto';
+import { getMyPrivateKey, getOrDeriveSharedKey } from '../lib/keyManager';
 
 export default function ChatPage() {
   const { user } = useApp();
@@ -33,9 +35,54 @@ export default function ChatPage() {
   const { data: messagesPage, isLoading } = useListMessages(conversationId);
   const messages: Message[] = messagesPage?.messages ?? [];
 
+  // E2E: derived AES-GCM shared key for this conversation
+  const [sharedKey, setSharedKey] = useState<CryptoKey | null>(null);
+  // Keep a ref so socket callbacks always read the latest value without
+  // causing the effect to re-register on every render.
+  const sharedKeyRef = useRef<CryptoKey | null>(null);
+  sharedKeyRef.current = sharedKey;
+
+  // Decrypted text per message id (only populated for E2E messages)
+  const [decryptedTexts, setDecryptedTexts] = useState<Map<string, string>>(new Map());
+
+  // Derive the shared key whenever the other user's public key becomes available
+  useEffect(() => {
+    if (!other?.publicKey) return;
+
+    void (async () => {
+      const privKey = await getMyPrivateKey();
+      if (!privKey) return;
+      try {
+        const sk = await getOrDeriveSharedKey(conversationId, privKey, other.publicKey!);
+        setSharedKey(sk);
+      } catch {
+        // Key derivation failed — chat continues in plaintext
+      }
+    })();
+  }, [conversationId, other?.publicKey]);
+
+  // Decrypt all loaded messages whenever the key or the message list changes
+  useEffect(() => {
+    if (!sharedKey || messages.length === 0) return;
+
+    void (async () => {
+      const map = new Map<string, string>();
+      for (const msg of messages) {
+        if (msg.text && isEncrypted(msg.text)) {
+          try {
+            map.set(msg.id, await decryptMessage(msg.text, sharedKey));
+          } catch {
+            map.set(msg.id, '[Encrypted message — key mismatch]');
+          }
+        }
+      }
+      setDecryptedTexts(map);
+    })();
+  }, [sharedKey, messages.length]);
+
   const sendMutation = useSendMessage({
     mutation: {
-      onSuccess: (newMsg) => {
+      onSuccess: async (newMsg) => {
         queryClient.setQueryData(
           getMessagesQueryKey(conversationId),
           (old: typeof messagesPage) => {
@@ -44,6 +91,13 @@ export default function ChatPage() {
             return { messages: [...existing, newMsg], nextCursor: old?.nextCursor ?? null };
           },
         );
+        // Decrypt the echoed-back message so our own sent bubble shows plaintext
+        if (newMsg.text && isEncrypted(newMsg.text) && sharedKeyRef.current) {
+          try {
+            const plain = await decryptMessage(newMsg.text, sharedKeyRef.current);
+            setDecryptedTexts(prev => new Map(prev).set(newMsg.id, plain));
+          } catch { /* show ciphertext as fallback */ }
+        }
         queryClient.invalidateQueries({ queryKey: getConversationsQueryKey() });
       },
     },
@@ -59,8 +113,9 @@ export default function ChatPage() {
     connectSocket();
     const socket = getSocket();
 
-    const handleNewMessage = (msg: Message) => {
+    const handleNewMessage = async (msg: Message) => {
       if (msg.conversationId !== conversationId) return;
+
       queryClient.setQueryData(
         getMessagesQueryKey(conversationId),
         (old: typeof messagesPage) => {
@@ -70,17 +125,47 @@ export default function ChatPage() {
         },
       );
       queryClient.invalidateQueries({ queryKey: getConversationsQueryKey() });
+
+      // Decrypt incoming E2E message
+      if (msg.text && isEncrypted(msg.text) && sharedKeyRef.current) {
+        try {
+          const plain = await decryptMessage(msg.text, sharedKeyRef.current);
+          setDecryptedTexts(prev => new Map(prev).set(msg.id, plain));
+        } catch {
+          setDecryptedTexts(prev => new Map(prev).set(msg.id, '[Encrypted message — key mismatch]'));
+        }
+      }
     };
 
-    socket.on('message:new', handleNewMessage);
-    return () => { socket.off('message:new', handleNewMessage); };
+    socket.on('message:new', (msg: Message) => { void handleNewMessage(msg); });
+    return () => { socket.off('message:new'); };
   }, [conversationId, queryClient]);
 
-  const handleSend = () => {
-    if (!text.trim()) return;
-    sendMutation.mutate({ conversationId, data: { text: text.trim(), contentType: 'text' } });
+  const handleSend = async () => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+
+    let payload = trimmed;
+    if (sharedKeyRef.current) {
+      try {
+        payload = await encryptMessage(trimmed, sharedKeyRef.current);
+      } catch {
+        // If encryption fails for any reason, send plaintext rather than losing the message
+      }
+    }
+
+    sendMutation.mutate({ conversationId, data: { text: payload, contentType: 'text' } });
     setText('');
   };
+
+  // Resolve display text: prefer decrypted, fall back to raw (plaintext legacy messages)
+  function displayText(msg: Message): string {
+    if (!msg.text) return '';
+    if (isEncrypted(msg.text)) return decryptedTexts.get(msg.id) ?? '🔒 Decrypting…';
+    return msg.text;
+  }
+
+  const e2eActive = !!sharedKey;
 
   if (!conv && !isLoading) {
     return (
@@ -113,8 +198,17 @@ export default function ChatPage() {
             <div>
               <h2 className="text-white font-medium">{other?.name ?? '...'}</h2>
               <div className="flex items-center gap-1.5">
-                {other?.status === 'online' && <div className="w-2 h-2 rounded-full bg-[#C6FF3B]" />}
-                <span className="text-[rgba(255,255,255,0.5)] text-xs capitalize">{other?.status ?? ''}</span>
+                {e2eActive ? (
+                  <>
+                    <Lock className="w-3 h-3 text-[#C6FF3B]" />
+                    <span className="text-[rgba(255,255,255,0.5)] text-xs">end-to-end encrypted</span>
+                  </>
+                ) : (
+                  <>
+                    {other?.status === 'online' && <div className="w-2 h-2 rounded-full bg-[#C6FF3B]" />}
+                    <span className="text-[rgba(255,255,255,0.5)] text-xs capitalize">{other?.status ?? ''}</span>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -139,6 +233,15 @@ export default function ChatPage() {
           </div>
         )}
 
+        {e2eActive && (
+          <div className="flex justify-center my-2">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[rgba(198,255,59,0.06)] border border-[rgba(198,255,59,0.15)] rounded-full">
+              <Lock className="w-3 h-3 text-[#C6FF3B]" />
+              <span className="text-[#C6FF3B] text-[11px] font-medium">Messages are end-to-end encrypted</span>
+            </div>
+          </div>
+        )}
+
         <div className="flex justify-center my-4">
           <span className="px-3 py-1 bg-[rgba(255,255,255,0.05)] rounded-full text-xs text-[rgba(255,255,255,0.5)]">Today</span>
         </div>
@@ -159,7 +262,7 @@ export default function ChatPage() {
                     : 'bg-[#1a1a1a] text-white rounded-tl-sm'
                 }`}
               >
-                <p className="text-[15px] leading-relaxed">{msg.text}</p>
+                <p className="text-[15px] leading-relaxed">{displayText(msg)}</p>
               </div>
               <div className="flex items-center gap-1 mt-1 px-1">
                 <span className="text-[10px] text-[rgba(255,255,255,0.4)]">{formatMessageTime(msg.createdAt)}</span>
@@ -182,8 +285,8 @@ export default function ChatPage() {
               type="text"
               value={text}
               onChange={(e) => setText(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
-              placeholder="Type a message..."
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) void handleSend(); }}
+              placeholder={e2eActive ? '🔒 Encrypted message…' : 'Type a message...'}
               className="flex-1 bg-transparent text-white placeholder-[rgba(255,255,255,0.4)] focus:outline-none px-2"
             />
             <button className="w-8 h-8 flex items-center justify-center text-[rgba(255,255,255,0.4)] hover:text-white">
@@ -194,7 +297,7 @@ export default function ChatPage() {
           {text.trim() ? (
             <motion.button
               whileTap={{ scale: 0.9 }}
-              onClick={handleSend}
+              onClick={() => void handleSend()}
               disabled={sendMutation.isPending}
               className="w-11 h-11 flex items-center justify-center rounded-full bg-[#C6FF3B] shrink-0 disabled:opacity-60"
             >

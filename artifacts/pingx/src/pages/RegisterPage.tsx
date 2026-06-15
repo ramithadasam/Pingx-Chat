@@ -1,16 +1,18 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useLocation } from 'wouter';
-import { useRegister } from '@workspace/api-client-react';
+import { useRegister, useUpdateMe } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { setToken } from '../lib/auth';
 import { connectSocket } from '../lib/socket';
+import { initializeKeys } from '../lib/keyManager';
 
 export default function RegisterPage() {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const registerMutation = useRegister();
+  const updateMeMutation = useUpdateMe();
 
   const [code, setCode] = useState('+91');
   const [phone, setPhone] = useState('');
@@ -46,6 +48,10 @@ export default function RegisterPage() {
           connectSocket();
           void queryClient.invalidateQueries();
           toast.success('Welcome to PingX!');
+          // Generate E2E keys on first registration and upload the public key
+          void initializeKeys().then((publicKey) => {
+            if (publicKey) updateMeMutation.mutate({ publicKey });
+          });
           setLocation('/home');
         },
         onError: (err) => {

@@ -7,12 +7,14 @@ import { useLocation } from 'wouter';
 import { toast } from 'sonner';
 import { UserPlus, UserMinus, User, Shield, Bell, HelpCircle, Info, LogOut } from 'lucide-react';
 import { getAvatarUrl } from '../lib/avatar';
+import { clearKeys } from '../lib/keyManager';
 
 export default function SettingsPage() {
   const { user, logout } = useApp();
   const [, setLocation] = useLocation();
 
   const handleLogout = () => {
+    clearKeys();
     logout();
     toast.success("Logged out successfully");
   };

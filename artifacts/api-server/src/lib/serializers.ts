@@ -16,6 +16,7 @@ export function serializeUser(user: UserRow) {
     avatarUrl: user.avatarUrl,
     status: user.status,
     showOfflineStatus: user.showOfflineStatus,
+    publicKey: user.publicKey ?? null,
     lastSeenAt: user.lastSeenAt ? user.lastSeenAt.toISOString() : null,
     createdAt: user.createdAt.toISOString(),
   };
@@ -36,6 +37,7 @@ export function serializePublicUser(user: UserRow) {
     avatarUrl: user.avatarUrl,
     status: user.status,
     showOfflineStatus: user.showOfflineStatus,
+    publicKey: user.publicKey ?? null,
     lastSeenAt: user.showOfflineStatus && user.lastSeenAt ? user.lastSeenAt.toISOString() : null,
     createdAt: user.createdAt.toISOString(),
   };

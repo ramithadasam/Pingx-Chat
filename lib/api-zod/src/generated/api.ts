@@ -94,6 +94,7 @@ export const UpdateMeBody = zod.object({
   name: zod.string().min(1).max(64).optional(),
   username: zod.string().min(3).max(32).optional(),
   bio: zod.string().max(160).optional(),
+  publicKey: zod.string().optional(),
 });
 
 export const UpdateSettingsBody = zod.object({

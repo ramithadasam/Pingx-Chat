@@ -1,16 +1,18 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useLocation } from 'wouter';
-import { useLogin } from '@workspace/api-client-react';
+import { useLogin, useUpdateMe } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { setToken } from '../lib/auth';
 import { connectSocket } from '../lib/socket';
+import { initializeKeys } from '../lib/keyManager';
 
 export default function LoginPage() {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const loginMutation = useLogin();
+  const updateMeMutation = useUpdateMe();
 
   const [code, setCode] = useState('+91');
   const [phone, setPhone] = useState('');
@@ -35,6 +37,10 @@ export default function LoginPage() {
           setToken(token);
           connectSocket();
           void queryClient.invalidateQueries();
+          // Generate/restore E2E keys and upload the public key to the server
+          void initializeKeys().then((publicKey) => {
+            if (publicKey) updateMeMutation.mutate({ publicKey });
+          });
           setLocation('/home');
         },
         onError: () => {

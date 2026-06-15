@@ -56,6 +56,7 @@ export interface UpdateProfileInput {
   name?: string;
   username?: string;
   bio?: string;
+  publicKey?: string;
 }
 
 export async function updateProfile(userId: string, updates: UpdateProfileInput): Promise<User> {

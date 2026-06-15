@@ -665,7 +665,7 @@ export function useDeleteThought<TError = ErrorType<unknown>, TContext = unknown
 // Users – update profile, settings, status
 // ---------------------------------------------------------------------------
 
-export const updateMe = async (body: Partial<{ name: string; username: string; bio: string }>, options?: RequestInit): Promise<{ user: User }> =>
+export const updateMe = async (body: Partial<{ name: string; username: string; bio: string; publicKey: string }>, options?: RequestInit): Promise<{ user: User }> =>
   customFetch<{ user: User }>(`/api/users/me`, { ...options, method: "PATCH", body: JSON.stringify(body) });
 
 export function useUpdateMe<TError = ErrorType<unknown>, TContext = unknown>(options?: {

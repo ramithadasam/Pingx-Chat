@@ -15,6 +15,7 @@ export const usersTable = pgTable("users", {
   avatarPublicId: text("avatar_public_id"),
   status: userStatusEnum("status").notNull().default("offline"),
   showOfflineStatus: boolean("show_offline_status").notNull().default(true),
+  publicKey: text("public_key"),
   lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

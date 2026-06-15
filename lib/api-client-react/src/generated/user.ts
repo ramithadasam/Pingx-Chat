@@ -19,6 +19,7 @@ export interface User {
   avatarUrl: string | null;
   status: UserStatus;
   showOfflineStatus: boolean;
+  publicKey: string | null;
   lastSeenAt: string | null;
   createdAt: string;
 }
