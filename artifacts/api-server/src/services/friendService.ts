@@ -328,4 +328,12 @@ export async function listBlockedUsers(userId: string): Promise<User[]> {
   return rows.map((r) => r.user);
 }
 
+export async function sendFriendRequestByPhone(senderId: string, phone: string): Promise<FriendRequestWithUsers> {
+  const [receiver] = await db.select().from(usersTable).where(eq(usersTable.phone, phone)).limit(1);
+  if (!receiver) {
+    throw new AppError(404, "user_not_found", "No user with that phone number");
+  }
+  return sendFriendRequest(senderId, receiver.id);
+}
+
 export { areBlocked, areFriends };

@@ -1,55 +1,63 @@
-import { useApp } from '../context/AppContext';
+import { useState } from 'react';
+import { useGetMe, useUpdateSettings } from '@workspace/api-client-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { PageHeader } from '../components/ui/custom/PageHeader';
 import { GlassCard } from '../components/ui/custom/GlassCard';
 import { SettingsRow } from '../components/ui/custom/SettingsRow';
 import { Shield } from 'lucide-react';
+import type { NotificationSettings } from '@workspace/api-client-react';
 
 export default function PrivacyPage() {
-  const { settings, updateSettings } = useApp();
+  const { data } = useGetMe({ query: { queryKey: ["/api/users/me"] } });
+  const queryClient = useQueryClient();
+  const updateSettings = useUpdateSettings();
+  const [pending, setPending] = useState<Partial<NotificationSettings>>({});
+
+  const settings = { ...data?.settings, ...pending };
+
+  const toggle = (key: keyof NotificationSettings, value: boolean) => {
+    const update = { [key]: value };
+    setPending(p => ({ ...p, ...update }));
+    updateSettings.mutate(update, {
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/users/me"] }),
+    });
+  };
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -20, opacity: 0 }} transition={{ duration: 0.2 }}
       className="min-h-[100dvh] relative pb-20"
     >
-      <PageHeader 
-        title="Privacy" 
-        rightElement={<Shield className="w-6 h-6 text-[#C9A8FF]" />}
-      />
-      
+      <PageHeader title="Privacy" rightElement={<Shield className="w-6 h-6 text-[#C9A8FF]" />} />
+
       <div className="p-4 space-y-6">
-        
         <div>
           <h3 className="text-[rgba(255,255,255,0.5)] text-sm font-medium ml-4 mb-2 uppercase tracking-wider">Privacy & Security</h3>
           <GlassCard className="overflow-hidden">
-            <SettingsRow 
-              label="End-to-End Encryption" 
+            <SettingsRow
+              label="End-to-End Encryption"
               description="Your messages are secure"
-              isToggle 
-              toggleChecked={settings.endToEndEncryption} 
-              onToggle={(v) => updateSettings({ endToEndEncryption: v })} 
+              isToggle
+              toggleChecked={settings.endToEndEncryption ?? true}
+              onToggle={(v) => toggle('endToEndEncryption', v)}
             />
             <div className="h-[1px] bg-[rgba(255,255,255,0.05)] w-full" />
-            <SettingsRow 
-              label="Vanish Mode" 
+            <SettingsRow
+              label="Vanish Mode"
               description="Messages disappear after seen"
-              isToggle 
-              toggleChecked={settings.vanishMode} 
-              onToggle={(v) => updateSettings({ vanishMode: v })} 
+              isToggle
+              toggleChecked={settings.vanishMode ?? false}
+              onToggle={(v) => toggle('vanishMode', v)}
             />
           </GlassCard>
         </div>
 
-        {settings.vanishMode && (
+        {(settings.vanishMode ?? false) && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}>
             <h3 className="text-[rgba(255,255,255,0.5)] text-sm font-medium ml-4 mb-2 uppercase tracking-wider">Vanish Mode Settings</h3>
             <GlassCard className="overflow-hidden">
-              <SettingsRow 
-                label="Vanish Timer" 
-                rightElement={<span className="text-[rgba(255,255,255,0.6)]">24 Hours</span>}
-                onClick={() => {}}
-              />
+              <SettingsRow label="Vanish Timer" rightElement={<span className="text-[rgba(255,255,255,0.6)]">24 Hours</span>} onClick={() => {}} />
             </GlassCard>
           </motion.div>
         )}
@@ -57,25 +65,17 @@ export default function PrivacyPage() {
         <div>
           <h3 className="text-[rgba(255,255,255,0.5)] text-sm font-medium ml-4 mb-2 uppercase tracking-wider">Additional Privacy</h3>
           <GlassCard className="overflow-hidden">
-            <SettingsRow 
-              label="Read Receipts" 
+            <SettingsRow
+              label="Read Receipts"
               description="Let others know when you read their msgs"
-              isToggle 
-              toggleChecked={settings.readReceipts} 
-              onToggle={(v) => updateSettings({ readReceipts: v })} 
+              isToggle
+              toggleChecked={settings.readReceipts ?? true}
+              onToggle={(v) => toggle('readReceipts', v)}
             />
             <div className="h-[1px] bg-[rgba(255,255,255,0.05)] w-full" />
-            <SettingsRow 
-              label="Profile Visibility" 
-              rightElement={<span className="text-[rgba(255,255,255,0.6)]">Everyone</span>}
-              onClick={() => {}}
-            />
+            <SettingsRow label="Profile Visibility" rightElement={<span className="text-[rgba(255,255,255,0.6)]">Everyone</span>} onClick={() => {}} />
             <div className="h-[1px] bg-[rgba(255,255,255,0.05)] w-full" />
-            <SettingsRow 
-              label="Blocked Users" 
-              rightElement={<span className="text-[rgba(255,255,255,0.6)]">0</span>}
-              onClick={() => {}}
-            />
+            <SettingsRow label="Blocked Users" rightElement={<span className="text-[rgba(255,255,255,0.6)]">0</span>} onClick={() => {}} />
           </GlassCard>
         </div>
 
@@ -84,7 +84,6 @@ export default function PrivacyPage() {
           <h4 className="text-white font-medium mb-1">Your Privacy Matters</h4>
           <p className="text-[rgba(255,255,255,0.6)] text-sm">PingX cannot read or listen to your personal messages and calls. Privacy is built into our DNA.</p>
         </div>
-
       </div>
     </motion.div>
   );

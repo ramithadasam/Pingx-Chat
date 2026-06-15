@@ -14,3 +14,103 @@ import * as zod from "zod";
 export const HealthCheckResponse = zod.object({
   status: zod.string(),
 });
+
+// ---------------------------------------------------------------------------
+// Auth
+// ---------------------------------------------------------------------------
+
+export const RegisterBody = zod.object({
+  phone: zod.string().regex(/^\+[1-9]\d{6,14}$/, "Phone must be in E.164 format, e.g. +919876543210"),
+  password: zod.string().min(8, "Password must be at least 8 characters"),
+  username: zod.string().min(3).max(32).regex(/^[a-zA-Z0-9_.]+$/),
+  name: zod.string().min(1).max(64),
+});
+
+export const LoginBody = zod.object({
+  phone: zod.string(),
+  password: zod.string(),
+});
+
+// ---------------------------------------------------------------------------
+// Conversations
+// ---------------------------------------------------------------------------
+
+export const CreateConversationBody = zod.object({
+  userId: zod.string().uuid(),
+});
+
+export const SendMessageBody = zod.object({
+  contentType: zod.enum(["text", "image", "file"]),
+  text: zod.string().nullable().optional(),
+  mediaUrl: zod.string().nullable().optional(),
+  mediaPublicId: zod.string().nullable().optional(),
+  mediaMimeType: zod.string().nullable().optional(),
+  mediaSize: zod.number().nullable().optional(),
+});
+
+// ---------------------------------------------------------------------------
+// Friends
+// ---------------------------------------------------------------------------
+
+export const SendFriendRequestBody = zod.object({
+  phone: zod.string(),
+});
+
+export const RespondToFriendRequestBody = zod.object({
+  action: zod.enum(["accept", "reject"]),
+});
+
+// ---------------------------------------------------------------------------
+// Notes
+// ---------------------------------------------------------------------------
+
+export const CreateNoteBody = zod.object({
+  content: zod.string().min(1),
+  color: zod.enum(["green", "purple", "pink"]).default("green"),
+});
+
+export const UpdateNoteBody = zod.object({
+  content: zod.string().min(1).optional(),
+  color: zod.enum(["green", "purple", "pink"]).optional(),
+});
+
+// ---------------------------------------------------------------------------
+// Thoughts
+// ---------------------------------------------------------------------------
+
+export const CreateThoughtBody = zod.object({
+  text: zod.string().min(1),
+});
+
+// ---------------------------------------------------------------------------
+// Users
+// ---------------------------------------------------------------------------
+
+export const SearchUsersQueryParams = zod.object({
+  q: zod.string().min(1),
+});
+
+export const UpdateMeBody = zod.object({
+  name: zod.string().min(1).max(64).optional(),
+  username: zod.string().min(3).max(32).optional(),
+  bio: zod.string().max(160).optional(),
+});
+
+export const UpdateSettingsBody = zod.object({
+  notificationsEnabled: zod.boolean().optional(),
+  messageNotifications: zod.boolean().optional(),
+  groupNotifications: zod.boolean().optional(),
+  mentions: zod.boolean().optional(),
+  friendRequests: zod.boolean().optional(),
+  newFriends: zod.boolean().optional(),
+  appUpdates: zod.boolean().optional(),
+  promotions: zod.boolean().optional(),
+  quietHours: zod.boolean().optional(),
+  readReceipts: zod.boolean().optional(),
+  endToEndEncryption: zod.boolean().optional(),
+  vanishMode: zod.boolean().optional(),
+});
+
+export const UpdateStatusBody = zod.object({
+  status: zod.enum(["online", "offline"]),
+});

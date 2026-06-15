@@ -1,10 +1,13 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppProvider } from "./context/AppContext";
 import { AnimatePresence } from "framer-motion";
+import { getToken } from "./lib/auth";
 
+import LoginPage from "./pages/LoginPage";
+import RegisterPage from "./pages/RegisterPage";
 import HomePage from "./pages/HomePage";
 import NotesPage from "./pages/NotesPage";
 import ThoughtsPage from "./pages/ThoughtsPage";
@@ -20,26 +23,68 @@ import ContactInfoPage from "./pages/ContactInfoPage";
 import StatusPage from "./pages/StatusPage";
 import NotFound from "@/pages/not-found";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      staleTime: 30_000,
+    },
+  },
+});
+
+function RequireAuth({ children }: { children: React.ReactNode }) {
+  if (!getToken()) return <Redirect to="/login" />;
+  return <>{children}</>;
+}
 
 function Router() {
   return (
     <AnimatePresence mode="wait">
       <Switch>
-        <Route path="/" component={HomePage} />
-        <Route path="/home" component={HomePage} />
-        <Route path="/notes" component={NotesPage} />
-        <Route path="/thoughts" component={ThoughtsPage} />
-        <Route path="/settings" component={SettingsPage} />
-        <Route path="/profile" component={ProfilePage} />
-        <Route path="/add-friend" component={AddFriendPage} />
-        <Route path="/remove-friend" component={RemoveFriendPage} />
-        <Route path="/privacy" component={PrivacyPage} />
-        <Route path="/notifications" component={NotificationsPage} />
-        <Route path="/help-support" component={HelpSupportPage} />
-        <Route path="/chat/:id" component={ChatPage} />
-        <Route path="/contact-info/:id" component={ContactInfoPage} />
-        <Route path="/status" component={StatusPage} />
+        <Route path="/login" component={LoginPage} />
+        <Route path="/register" component={RegisterPage} />
+        <Route path="/">
+          <Redirect to={getToken() ? "/home" : "/login"} />
+        </Route>
+        <Route path="/home">
+          <RequireAuth><HomePage /></RequireAuth>
+        </Route>
+        <Route path="/notes">
+          <RequireAuth><NotesPage /></RequireAuth>
+        </Route>
+        <Route path="/thoughts">
+          <RequireAuth><ThoughtsPage /></RequireAuth>
+        </Route>
+        <Route path="/settings">
+          <RequireAuth><SettingsPage /></RequireAuth>
+        </Route>
+        <Route path="/profile">
+          <RequireAuth><ProfilePage /></RequireAuth>
+        </Route>
+        <Route path="/add-friend">
+          <RequireAuth><AddFriendPage /></RequireAuth>
+        </Route>
+        <Route path="/remove-friend">
+          <RequireAuth><RemoveFriendPage /></RequireAuth>
+        </Route>
+        <Route path="/privacy">
+          <RequireAuth><PrivacyPage /></RequireAuth>
+        </Route>
+        <Route path="/notifications">
+          <RequireAuth><NotificationsPage /></RequireAuth>
+        </Route>
+        <Route path="/help-support">
+          <RequireAuth><HelpSupportPage /></RequireAuth>
+        </Route>
+        <Route path="/chat/:id">
+          <RequireAuth><ChatPage /></RequireAuth>
+        </Route>
+        <Route path="/contact-info/:id">
+          <RequireAuth><ContactInfoPage /></RequireAuth>
+        </Route>
+        <Route path="/status">
+          <RequireAuth><StatusPage /></RequireAuth>
+        </Route>
         <Route component={NotFound} />
       </Switch>
     </AnimatePresence>

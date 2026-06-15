@@ -7,3 +7,8 @@ export function avatarUrlFor(user: { avatarUrl?: string | null; username: string
   if (user.avatarUrl) return user.avatarUrl;
   return `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(user.username)}`;
 }
+
+export function getAvatarUrl(avatarUrl: string | null, name: string): string {
+  if (avatarUrl) return avatarUrl;
+  return `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name)}`;
+}

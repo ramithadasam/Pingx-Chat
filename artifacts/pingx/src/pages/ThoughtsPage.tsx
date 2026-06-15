@@ -1,17 +1,40 @@
 import { useState } from 'react';
-import { useApp } from '../context/AppContext';
 import { motion } from 'framer-motion';
 import { PageHeader } from '../components/ui/custom/PageHeader';
 import { Trash2 } from 'lucide-react';
+import { useListThoughts, useCreateThought, useDeleteThought, getThoughtsQueryKey } from '@workspace/api-client-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 export default function ThoughtsPage() {
-  const { thoughts, addThought } = useApp();
+  const queryClient = useQueryClient();
+  const { data: thoughts = [], isLoading } = useListThoughts();
+  const createThought = useCreateThought();
+  const deleteThought = useDeleteThought();
   const [newThought, setNewThought] = useState('');
 
   const handleSave = () => {
     if (!newThought.trim()) return;
-    addThought(newThought);
-    setNewThought('');
+    createThought.mutate(
+      { data: { text: newThought } },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getThoughtsQueryKey() });
+          setNewThought('');
+        },
+        onError: () => toast.error('Failed to save thought'),
+      },
+    );
+  };
+
+  const handleDelete = (id: string) => {
+    deleteThought.mutate(
+      { id },
+      {
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: getThoughtsQueryKey() }),
+        onError: () => toast.error('Failed to delete thought'),
+      },
+    );
   };
 
   const formatDate = (dateString: string) => {
@@ -20,12 +43,12 @@ export default function ThoughtsPage() {
   };
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -20, opacity: 0 }} transition={{ duration: 0.2 }}
       className="min-h-[100dvh] relative pb-20"
     >
       <PageHeader title="Add a Thought" />
-      
+
       <div className="p-4">
         <textarea
           value={newThought}
@@ -33,21 +56,29 @@ export default function ThoughtsPage() {
           placeholder="What's on your mind?"
           className="w-full h-40 bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.08)] rounded-[24px] p-5 text-white text-lg placeholder-[rgba(255,255,255,0.3)] focus:outline-none focus:border-[#FFC6DA] transition-colors resize-none mb-4"
         />
-        
+
         <motion.button
           whileTap={{ scale: 0.95 }}
           onClick={handleSave}
-          disabled={!newThought.trim()}
+          disabled={!newThought.trim() || createThought.isPending}
           className="w-full py-4 bg-[#FFC6DA] text-[#050505] rounded-full font-semibold text-lg hover:bg-[#ffb0ca] disabled:opacity-50 transition-colors mb-8"
         >
-          Save Thought
+          {createThought.isPending ? 'Saving...' : 'Save Thought'}
         </motion.button>
-        
+
         <div className="space-y-4">
           <h3 className="text-white font-medium mb-4">Previous Thoughts</h3>
-          
+
+          {isLoading && (
+            <div className="space-y-3">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="h-24 rounded-[24px] bg-[rgba(255,255,255,0.03)] animate-pulse" />
+              ))}
+            </div>
+          )}
+
           {thoughts.map(thought => (
-            <motion.div 
+            <motion.div
               key={thought.id}
               initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
               className="bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.05)] rounded-[24px] p-5"
@@ -55,14 +86,17 @@ export default function ThoughtsPage() {
               <p className="text-white text-[15px] leading-relaxed mb-4">{thought.text}</p>
               <div className="flex justify-between items-center">
                 <span className="text-[rgba(255,255,255,0.4)] text-sm">{formatDate(thought.createdAt)}</span>
-                <button className="text-[rgba(255,255,255,0.4)] hover:text-[#EF4444] transition-colors p-2">
+                <button
+                  onClick={() => handleDelete(thought.id)}
+                  className="text-[rgba(255,255,255,0.4)] hover:text-[#EF4444] transition-colors p-2"
+                >
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>
             </motion.div>
           ))}
-          
-          {thoughts.length === 0 && (
+
+          {!isLoading && thoughts.length === 0 && (
             <div className="text-center text-[rgba(255,255,255,0.4)] py-10">
               No thoughts yet.
             </div>

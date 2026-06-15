@@ -3,55 +3,117 @@ import { useApp } from '../context/AppContext';
 import { motion } from 'framer-motion';
 import { useParams, useLocation } from 'wouter';
 import { ArrowLeft, Phone, Video, MoreVertical, Plus, Smile, Mic, Send, CheckCheck } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import {
+  useListConversations,
+  useListMessages,
+  useSendMessage,
+  getMessagesQueryKey,
+  getConversationsQueryKey,
+} from '@workspace/api-client-react';
+import type { Message } from '@workspace/api-client-react';
+import { getSocket, connectSocket } from '../lib/socket';
+import { getAvatarUrl } from '../lib/avatar';
+import { formatMessageTime } from '../lib/format';
 
 export default function ChatPage() {
-  const { contacts, messages, sendMessage } = useApp();
+  const { user } = useApp();
   const params = useParams();
   const [, setLocation] = useLocation();
   const [text, setText] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  
-  const id = params.id as string;
-  const contact = contacts.find(c => c.id === id);
-  const chatMessages = messages[id] || [];
+  const queryClient = useQueryClient();
 
+  const conversationId = params.id as string;
+
+  const { data: conversations = [] } = useListConversations();
+  const conv = conversations.find(c => c.id === conversationId);
+  const other = conv?.otherUser;
+
+  const { data: messagesPage, isLoading } = useListMessages(conversationId);
+  const messages: Message[] = messagesPage?.messages ?? [];
+
+  const sendMutation = useSendMessage({
+    mutation: {
+      onSuccess: (newMsg) => {
+        queryClient.setQueryData(
+          getMessagesQueryKey(conversationId),
+          (old: typeof messagesPage) => ({
+            messages: [...(old?.messages ?? []), newMsg],
+            nextCursor: old?.nextCursor ?? null,
+          }),
+        );
+        queryClient.invalidateQueries({ queryKey: getConversationsQueryKey() });
+      },
+    },
+  });
+
+  // Auto-scroll on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [chatMessages]);
+  }, [messages.length]);
 
-  if (!contact) {
-    return <div className="min-h-[100dvh] flex items-center justify-center text-white">Contact not found</div>;
-  }
+  // Socket.IO: listen for incoming messages
+  useEffect(() => {
+    connectSocket();
+    const socket = getSocket();
+
+    const handleNewMessage = (msg: Message) => {
+      if (msg.conversationId !== conversationId) return;
+      queryClient.setQueryData(
+        getMessagesQueryKey(conversationId),
+        (old: typeof messagesPage) => {
+          const existing = old?.messages ?? [];
+          if (existing.some(m => m.id === msg.id)) return old;
+          return { messages: [...existing, msg], nextCursor: old?.nextCursor ?? null };
+        },
+      );
+      queryClient.invalidateQueries({ queryKey: getConversationsQueryKey() });
+    };
+
+    socket.on('message:new', handleNewMessage);
+    return () => { socket.off('message:new', handleNewMessage); };
+  }, [conversationId, queryClient]);
 
   const handleSend = () => {
     if (!text.trim()) return;
-    sendMessage(id, text);
+    sendMutation.mutate({ conversationId, data: { text: text.trim(), contentType: 'text' } });
     setText('');
   };
 
+  if (!conv && !isLoading) {
+    return (
+      <div className="min-h-[100dvh] flex items-center justify-center text-white">
+        Conversation not found
+      </div>
+    );
+  }
+
+  const avatarSrc = getAvatarUrl(other?.avatarUrl ?? null, other?.name ?? '?');
+
   return (
-    <motion.div 
+    <motion.div
       initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -20, opacity: 0 }} transition={{ duration: 0.2 }}
       className="h-[100dvh] flex flex-col relative overflow-hidden bg-[#050505]"
     >
       <header className="flex items-center justify-between p-3 border-b border-[rgba(255,255,255,0.05)] bg-[#050505]/90 backdrop-blur-md z-10 shrink-0">
         <div className="flex items-center gap-3">
-          <button 
+          <button
             onClick={() => setLocation('/home')}
             className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-[rgba(255,255,255,0.1)] transition-colors"
           >
             <ArrowLeft className="w-6 h-6 text-white" />
           </button>
-          <div 
+          <div
             className="flex items-center gap-3 cursor-pointer"
-            onClick={() => setLocation(`/contact-info/${id}`)}
+            onClick={() => other && setLocation(`/contact-info/${other.id}`)}
           >
-            <img src={contact.avatar} alt={contact.name} className="w-10 h-10 rounded-full" />
+            <img src={avatarSrc} alt={other?.name} className="w-10 h-10 rounded-full bg-[#1a1a1a]" />
             <div>
-              <h2 className="text-white font-medium">{contact.name}</h2>
+              <h2 className="text-white font-medium">{other?.name ?? '...'}</h2>
               <div className="flex items-center gap-1.5">
-                {contact.status === 'online' && <div className="w-2 h-2 rounded-full bg-[#C6FF3B]" />}
-                <span className="text-[rgba(255,255,255,0.5)] text-xs capitalize">{contact.status}</span>
+                {other?.status === 'online' && <div className="w-2 h-2 rounded-full bg-[#C6FF3B]" />}
+                <span className="text-[rgba(255,255,255,0.5)] text-xs capitalize">{other?.status ?? ''}</span>
               </div>
             </div>
           </div>
@@ -70,32 +132,41 @@ export default function ChatPage() {
       </header>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {isLoading && (
+          <div className="flex justify-center py-8">
+            <div className="w-6 h-6 border-2 border-[#C6FF3B] border-t-transparent rounded-full animate-spin" />
+          </div>
+        )}
+
         <div className="flex justify-center my-4">
           <span className="px-3 py-1 bg-[rgba(255,255,255,0.05)] rounded-full text-xs text-[rgba(255,255,255,0.5)]">Today</span>
         </div>
-        
-        {chatMessages.map(msg => (
-          <motion.div 
-            key={msg.id}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className={`flex flex-col ${msg.sent ? 'items-end' : 'items-start'}`}
-          >
-            <div 
-              className={`max-w-[75%] rounded-[20px] px-4 py-2.5 ${
-                msg.sent 
-                  ? 'bg-[#C6FF3B] text-[#050505] rounded-tr-sm' 
-                  : 'bg-[#1a1a1a] text-white rounded-tl-sm'
-              }`}
+
+        {messages.map(msg => {
+          const isSent = msg.senderId === user?.id;
+          return (
+            <motion.div
+              key={msg.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className={`flex flex-col ${isSent ? 'items-end' : 'items-start'}`}
             >
-              <p className="text-[15px] leading-relaxed">{msg.text}</p>
-            </div>
-            <div className="flex items-center gap-1 mt-1 px-1">
-              <span className="text-[10px] text-[rgba(255,255,255,0.4)]">{msg.time}</span>
-              {msg.sent && <CheckCheck className="w-3 h-3 text-[#C6FF3B]" />}
-            </div>
-          </motion.div>
-        ))}
+              <div
+                className={`max-w-[75%] rounded-[20px] px-4 py-2.5 ${
+                  isSent
+                    ? 'bg-[#C6FF3B] text-[#050505] rounded-tr-sm'
+                    : 'bg-[#1a1a1a] text-white rounded-tl-sm'
+                }`}
+              >
+                <p className="text-[15px] leading-relaxed">{msg.text}</p>
+              </div>
+              <div className="flex items-center gap-1 mt-1 px-1">
+                <span className="text-[10px] text-[rgba(255,255,255,0.4)]">{formatMessageTime(msg.createdAt)}</span>
+                {isSent && <CheckCheck className="w-3 h-3 text-[#C6FF3B]" />}
+              </div>
+            </motion.div>
+          );
+        })}
         <div ref={messagesEndRef} />
       </div>
 
@@ -104,13 +175,13 @@ export default function ChatPage() {
           <button className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-[rgba(255,255,255,0.1)] text-[rgba(255,255,255,0.6)]">
             <Plus className="w-6 h-6" />
           </button>
-          
+
           <div className="flex-1 flex items-center bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] rounded-full px-3 py-1.5 min-h-[44px]">
-            <input 
+            <input
               type="text"
               value={text}
               onChange={(e) => setText(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+              onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
               placeholder="Type a message..."
               className="flex-1 bg-transparent text-white placeholder-[rgba(255,255,255,0.4)] focus:outline-none px-2"
             />
@@ -118,12 +189,13 @@ export default function ChatPage() {
               <Smile className="w-5 h-5" />
             </button>
           </div>
-          
+
           {text.trim() ? (
-            <motion.button 
+            <motion.button
               whileTap={{ scale: 0.9 }}
               onClick={handleSend}
-              className="w-11 h-11 flex items-center justify-center rounded-full bg-[#C6FF3B] shrink-0"
+              disabled={sendMutation.isPending}
+              className="w-11 h-11 flex items-center justify-center rounded-full bg-[#C6FF3B] shrink-0 disabled:opacity-60"
             >
               <Send className="w-5 h-5 text-[#050505] ml-1" />
             </motion.button>

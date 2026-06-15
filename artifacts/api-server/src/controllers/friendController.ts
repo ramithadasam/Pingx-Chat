@@ -10,10 +10,10 @@ import {
 import { getIo } from "../sockets";
 
 export async function sendFriendRequest(req: Request, res: Response): Promise<void> {
-  const { receiverId } = SendFriendRequestBody.parse(req.body);
-  const request = await friendService.sendFriendRequest(req.userId!, receiverId);
+  const { phone } = SendFriendRequestBody.parse(req.body);
+  const request = await friendService.sendFriendRequestByPhone(req.userId!, phone);
 
-  getIo()?.to(`user:${receiverId}`).emit("friend:request", serializeFriendRequest(request));
+  getIo()?.to(`user:${request.receiver.id}`).emit("friend:request", serializeFriendRequest(request));
 
   res.status(201).json(serializeFriendRequest(request));
 }
