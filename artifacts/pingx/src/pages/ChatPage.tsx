@@ -38,10 +38,11 @@ export default function ChatPage() {
       onSuccess: (newMsg) => {
         queryClient.setQueryData(
           getMessagesQueryKey(conversationId),
-          (old: typeof messagesPage) => ({
-            messages: [...(old?.messages ?? []), newMsg],
-            nextCursor: old?.nextCursor ?? null,
-          }),
+          (old: typeof messagesPage) => {
+            const existing = old?.messages ?? [];
+            if (existing.some(m => m.id === newMsg.id)) return old;
+            return { messages: [...existing, newMsg], nextCursor: old?.nextCursor ?? null };
+          },
         );
         queryClient.invalidateQueries({ queryKey: getConversationsQueryKey() });
       },
